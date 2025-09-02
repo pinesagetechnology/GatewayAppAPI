@@ -1,0 +1,45 @@
+# Build outputs
+[Bb]in/
+[Oo]bj/
+[Dd]ebug/
+[Rr]elease/
+[Aa]rtifacts/
+[Tt]est[Rr]esults/
+
+# IDEs/editors
+.vs/
+.vscode/
+.idea/
+
+# OS junk
+.DS_Store
+Thumbs.db
+
+# User files
+*.user
+*.userosscache
+*.suo
+*.sln.docstates
+
+# Packages
+[Pp]ackages/
+*.nupkg
+*.snupkg
+
+# Logs/temp
+logs/
+*.log
+*.tmp
+*.cache
+
+# NuGet
+project.lock.json
+project.fragment.lock.json
+artifacts/
+
+# Rider
+*.sln.iml
+
+# Optional: uncomment if you want to ignore local env/config secrets
+# .env
+# appsettings.Development.json
