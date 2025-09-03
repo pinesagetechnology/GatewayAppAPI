@@ -55,68 +55,6 @@ namespace AzureGateway.Api.Data
                 .WithMany(uq => uq.UploadProgresses)
                 .HasForeignKey(up => up.UploadQueueId)
                 .OnDelete(DeleteBehavior.Cascade);
-
-            // Seed default configurations
-            SeedDefaultData(modelBuilder);
-        }
-
-        private static void SeedDefaultData(ModelBuilder modelBuilder)
-        {
-            var defaultConfigs = new[]
-            {
-                new Configuration
-                {
-                    Key = "Azure.StorageConnectionString",
-                    Value = "",
-                    Description = "Azure Storage Account connection string",
-                    Category = "Azure",
-                    IsEncrypted = true
-                },
-                new Configuration
-                {
-                    Key = "Azure.DefaultContainer",
-                    Value = "gateway-data",
-                    Description = "Default Azure blob container name",
-                    Category = "Azure"
-                },
-                new Configuration
-                {
-                    Key = "Upload.MaxRetries",
-                    Value = "5",
-                    Description = "Maximum number of retry attempts for failed uploads",
-                    Category = "Upload"
-                },
-                new Configuration
-                {
-                    Key = "Upload.RetryDelaySeconds",
-                    Value = "30",
-                    Description = "Delay in seconds between retry attempts",
-                    Category = "Upload"
-                },
-                new Configuration
-                {
-                    Key = "Upload.BatchSize",
-                    Value = "10",
-                    Description = "Number of files to process in each batch",
-                    Category = "Upload"
-                },
-                new Configuration
-                {
-                    Key = "Monitoring.FolderPath",
-                    Value = "/home/pi/gateway/incoming",
-                    Description = "Default folder path to monitor for new files",
-                    Category = "Monitoring"
-                },
-                new Configuration
-                {
-                    Key = "Api.PollingIntervalMinutes",
-                    Value = "5",
-                    Description = "Interval in minutes for polling third-party API",
-                    Category = "Api"
-                }
-            };
-
-            modelBuilder.Entity<Configuration>().HasData(defaultConfigs);
         }
     }
 }

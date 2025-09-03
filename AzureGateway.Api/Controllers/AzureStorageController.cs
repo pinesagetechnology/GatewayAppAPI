@@ -202,9 +202,8 @@ namespace AzureGateway.Api.Controllers
                         "Maximum number of concurrent uploads", "Azure");
                 }
 
-                // Test the new configuration
-                var testService = new AzureStorageService(_configService, _logger);
-                var isConnected = await testService.IsConnectedAsync();
+                // Test the new configuration using injected service
+                var isConnected = await _azureService.IsConnectedAsync();
 
                 return Ok(new
                 {

@@ -7,18 +7,25 @@ namespace AzureGateway.Api.Services
 {
     public class ConfigurationService : IConfigurationService
     {
-        private readonly ApplicationDbContext _context;
+        private readonly IServiceProvider _serviceProvider;
         private readonly ILogger<ConfigurationService> _logger;
 
-        public ConfigurationService(ApplicationDbContext context, ILogger<ConfigurationService> logger)
+        public ConfigurationService(IServiceProvider serviceProvider, ILogger<ConfigurationService> logger)
         {
-            _context = context;
+            _serviceProvider = serviceProvider;
             _logger = logger;
+        }
+
+        private ApplicationDbContext CreateContext()
+        {
+            var scope = _serviceProvider.CreateScope();
+            return scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
         }
 
         public async Task<string?> GetValueAsync(string key)
         {
-            var config = await _context.Configuration.FindAsync(key);
+            using var context = CreateContext();
+            var config = await context.Configuration.FindAsync(key);
             return config?.Value;
         }
 
@@ -54,7 +61,8 @@ namespace AzureGateway.Api.Services
 
         public async Task SetValueAsync(string key, string value, string? description = null, string? category = null)
         {
-            var existing = await _context.Configuration.FindAsync(key);
+            using var context = CreateContext();
+            var existing = await context.Configuration.FindAsync(key);
             
             if (existing != null)
             {
@@ -75,16 +83,17 @@ namespace AzureGateway.Api.Services
                     Category = category,
                     UpdatedAt = DateTime.UtcNow
                 };
-                _context.Configuration.Add(config);
+                context.Configuration.Add(config);
             }
 
-            await _context.SaveChangesAsync();
+            await context.SaveChangesAsync();
             _logger.LogDebug("Updated configuration: {Key} = {Value}", key, value);
         }
 
         public async Task<Dictionary<string, string>> GetCategoryAsync(string category)
         {
-            var configs = await _context.Configuration
+            using var context = CreateContext();
+            var configs = await context.Configuration
                 .Where(c => c.Category == category)
                 .ToListAsync();
 
@@ -93,23 +102,26 @@ namespace AzureGateway.Api.Services
 
         public async Task<bool> KeyExistsAsync(string key)
         {
-            return await _context.Configuration.AnyAsync(c => c.Key == key);
+            using var context = CreateContext();
+            return await context.Configuration.AnyAsync(c => c.Key == key);
         }
 
         public async Task DeleteAsync(string key)
         {
-            var config = await _context.Configuration.FindAsync(key);
+            using var context = CreateContext();
+            var config = await context.Configuration.FindAsync(key);
             if (config != null)
             {
-                _context.Configuration.Remove(config);
-                await _context.SaveChangesAsync();
+                context.Configuration.Remove(config);
+                await context.SaveChangesAsync();
                 _logger.LogInformation("Deleted configuration key: {Key}", key);
             }
         }
 
         public async Task<IEnumerable<Models.Configuration>> GetAllAsync()
         {
-            return await _context.Configuration
+            using var context = CreateContext();
+            return await context.Configuration
                 .OrderBy(c => c.Category)
                 .ThenBy(c => c.Key)
                 .ToListAsync();

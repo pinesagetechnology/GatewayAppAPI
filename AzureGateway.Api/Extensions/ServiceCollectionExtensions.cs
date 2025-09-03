@@ -25,8 +25,48 @@ namespace AzureGateway.Api.Extensions
             
             // Register services
             services.AddScoped<IUploadQueueService, UploadQueueService>();
-            services.AddScoped<IConfigurationService, ConfigurationService>();
+            services.AddSingleton<IConfigurationService, ConfigurationService>();
 
+            return services;
+        }
+
+        public static async Task<IServiceProvider> SeedConfigurationFromAppSettingsAsync(this IServiceProvider services, IConfiguration configuration)
+        {
+            using var scope = services.CreateScope();
+            var configService = scope.ServiceProvider.GetRequiredService<IConfigurationService>();
+            var logger = scope.ServiceProvider.GetRequiredService<ILogger<IServiceProvider>>();
+
+            var configDefaults = configuration.GetSection("ConfigurationDefaults");
+            if (!configDefaults.Exists())
+            {
+                logger.LogWarning("ConfigurationDefaults section not found in appsettings.json");
+                return services;
+            }
+
+            var seededCount = 0;
+            foreach (var category in configDefaults.GetChildren())
+            {
+                foreach (var setting in category.GetChildren())
+                {
+                    var key = $"{category.Key}.{setting.Key}";
+                    var value = setting.Value ?? "";
+                    
+                    var exists = await configService.KeyExistsAsync(key);
+                    if (!exists)
+                    {
+                        await configService.SetValueAsync(
+                            key,
+                            value,
+                            $"Default value from appsettings.json for {key}",
+                            category.Key);
+                        
+                        seededCount++;
+                        logger.LogDebug("Seeded configuration from appsettings: {Key} = {Value}", key, value);
+                    }
+                }
+            }
+
+            logger.LogInformation("Seeded {Count} configuration values from appsettings.json", seededCount);
             return services;
         }
 

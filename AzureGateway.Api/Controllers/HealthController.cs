@@ -62,19 +62,6 @@ namespace AzureGateway.Api.Controllers
             }
         }
 
-        [HttpPost("test-operations")]
-        public async Task<IActionResult> TestOperations()
-        {
-            try
-            {
-                var success = await _healthService.TestAllOperationsAsync();
-                return Ok(new { Success = success, Message = success ? "All operations passed" : "Some operations failed" });
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Database operations test failed");
-                return StatusCode(500, new { Error = "Operations test failed", Details = ex.Message });
-            }
-        }
+        
     }
 }

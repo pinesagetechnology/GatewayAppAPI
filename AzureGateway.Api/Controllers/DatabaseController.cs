@@ -22,60 +22,7 @@ namespace AzureGateway.Api.Controllers
             _logger = logger;
         }
 
-        [HttpGet("test")]
-        public async Task<IActionResult> TestDatabase()
-        {
-            try
-            {
-                // Test basic database operations
-                var pendingCount = (await _uploadQueueService.GetPendingUploadsAsync()).Count();
-                var failedCount = (await _uploadQueueService.GetFailedUploadsAsync()).Count();
-                var configCount = (await _configService.GetAllAsync()).Count();
-
-                var result = new
-                {
-                    Status = "Success",
-                    Message = "Database connection successful",
-                    Stats = new
-                    {
-                        PendingUploads = pendingCount,
-                        FailedUploads = failedCount,
-                        ConfigurationEntries = configCount
-                    },
-                    Timestamp = DateTime.UtcNow
-                };
-
-                _logger.LogInformation("Database test completed successfully");
-                return Ok(result);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Database test failed");
-                return StatusCode(500, new { Error = "Database test failed", Details = ex.Message });
-            }
-        }
-
-        [HttpPost("test-upload")]
-        public async Task<IActionResult> TestUploadQueue([FromBody] TestUploadRequest request)
-        {
-            try
-            {
-                var upload = await _uploadQueueService.AddToQueueAsync(
-                    request.FilePath,
-                    request.FileType,
-                    request.Source,
-                    request.FileSize
-                );
-
-                _logger.LogInformation("Test upload added: {FileName}", upload.FileName);
-                return Ok(new { Message = "Test upload added successfully", UploadId = upload.Id });
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Failed to add test upload");
-                return BadRequest(new { Error = "Failed to add test upload", Details = ex.Message });
-            }
-        }
+        
 
         [HttpGet("config")]
         public async Task<IActionResult> GetAllConfig()
@@ -115,13 +62,7 @@ namespace AzureGateway.Api.Controllers
         }
     }
 
-    public class TestUploadRequest
-    {
-        public string FilePath { get; set; } = string.Empty;
-        public FileType FileType { get; set; }
-        public DataSource Source { get; set; }
-        public long FileSize { get; set; }
-    }
+    
 
     public class SetConfigRequest
     {

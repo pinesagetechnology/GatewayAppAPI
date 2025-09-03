@@ -1,9 +1,11 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
-VisualStudioVersion = 17.13.35806.99 d17.13
+VisualStudioVersion = 17.13.35806.99
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AzureGateway.Api", "AzureGateway.Api\AzureGateway.Api.csproj", "{62FB4D55-32AE-4F3A-9BD8-BEAF90626DAA}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AzureGateway.APi.Tests", "AzureGateway.APi.Tests\AzureGateway.APi.Tests.csproj", "{431EDAD9-1FDE-450D-817C-F3CCA4BFB0A9}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -15,6 +17,10 @@ Global
 		{62FB4D55-32AE-4F3A-9BD8-BEAF90626DAA}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{62FB4D55-32AE-4F3A-9BD8-BEAF90626DAA}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{62FB4D55-32AE-4F3A-9BD8-BEAF90626DAA}.Release|Any CPU.Build.0 = Release|Any CPU
+		{431EDAD9-1FDE-450D-817C-F3CCA4BFB0A9}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{431EDAD9-1FDE-450D-817C-F3CCA4BFB0A9}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{431EDAD9-1FDE-450D-817C-F3CCA4BFB0A9}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{431EDAD9-1FDE-450D-817C-F3CCA4BFB0A9}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

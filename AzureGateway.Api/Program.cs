@@ -59,9 +59,8 @@ var app = builder.Build();
 // Initialize database
 await app.Services.InitializeDatabaseAsync();
 
-// Seed file monitoring configurations
-await app.Services.SeedFileMonitoringConfigAsync();
-await app.Services.SeedUploadConfigAsync();
+// Seed configuration from appsettings.json
+await app.Services.SeedConfigurationFromAppSettingsAsync(builder.Configuration);
 
 try
 {
