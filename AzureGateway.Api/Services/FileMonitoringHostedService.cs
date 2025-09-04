@@ -1,6 +1,6 @@
 ﻿using AzureGateway.Api.Services.interfaces;
 
-namespace AzureGateway.Api.HostedServices
+namespace AzureGateway.Api.Services
 {
     public class FileMonitoringHostedService : BackgroundService
     {

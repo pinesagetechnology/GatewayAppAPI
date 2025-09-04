@@ -1,5 +1,4 @@
 ﻿using AzureGateway.Api.Services;
-using AzureGateway.Api.HostedServices;
 using AzureGateway.Api.Services.interfaces;
 
 namespace AzureGateway.Api.Extensions

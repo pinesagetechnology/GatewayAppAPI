@@ -17,5 +17,6 @@ namespace AzureGateway.Api.Services.interfaces
         Task ArchiveCompletedUploadsAsync(int olderThanDays = 30);
         Task<IEnumerable<UploadQueue>> GetRecentUploadsAsync(int count = 50);
         Task<UploadQueue?> GetUploadByIdAsync(int id);
+        Task<object> GetQueueSummaryAsync();
     }
 }

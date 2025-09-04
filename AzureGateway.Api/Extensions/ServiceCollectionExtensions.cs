@@ -25,6 +25,7 @@ namespace AzureGateway.Api.Extensions
             
             // Register services
             services.AddScoped<IUploadQueueService, UploadQueueService>();
+            services.AddScoped<IDatabaseHealthService, DatabaseHealthService>();
             services.AddSingleton<IConfigurationService, ConfigurationService>();
 
             return services;
@@ -36,6 +37,8 @@ namespace AzureGateway.Api.Extensions
             var configService = scope.ServiceProvider.GetRequiredService<IConfigurationService>();
             var logger = scope.ServiceProvider.GetRequiredService<ILogger<IServiceProvider>>();
 
+            logger.LogInformation("=== Starting Configuration Seeding ===");
+            
             var configDefaults = configuration.GetSection("ConfigurationDefaults");
             if (!configDefaults.Exists())
             {
@@ -43,30 +46,57 @@ namespace AzureGateway.Api.Extensions
                 return services;
             }
 
+            logger.LogInformation("Found ConfigurationDefaults section with {CategoryCount} categories", 
+                configDefaults.GetChildren().Count());
+
             var seededCount = 0;
+            var skippedCount = 0;
+            var errorCount = 0;
+
             foreach (var category in configDefaults.GetChildren())
             {
-                foreach (var setting in category.GetChildren())
+                logger.LogInformation("Processing configuration category: {Category}", category.Key);
+                var categorySettings = category.GetChildren().ToList();
+                logger.LogInformation("Category {Category} contains {SettingCount} settings", 
+                    category.Key, categorySettings.Count);
+
+                foreach (var setting in categorySettings)
                 {
                     var key = $"{category.Key}.{setting.Key}";
                     var value = setting.Value ?? "";
                     
-                    var exists = await configService.KeyExistsAsync(key);
-                    if (!exists)
+                    try
                     {
-                        await configService.SetValueAsync(
-                            key,
-                            value,
-                            $"Default value from appsettings.json for {key}",
-                            category.Key);
-                        
-                        seededCount++;
-                        logger.LogDebug("Seeded configuration from appsettings: {Key} = {Value}", key, value);
+                        var exists = await configService.KeyExistsAsync(key);
+                        if (!exists)
+                        {
+                            await configService.SetValueAsync(
+                                key,
+                                value,
+                                $"Default value from appsettings.json for {key}",
+                                category.Key);
+                            
+                            seededCount++;
+                            logger.LogDebug("Seeded configuration: {Key} = {Value}", key, value);
+                        }
+                        else
+                        {
+                            skippedCount++;
+                            logger.LogDebug("Configuration key {Key} already exists, skipping", key);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        errorCount++;
+                        logger.LogError(ex, "Failed to seed configuration key: {Key}", key);
                     }
                 }
             }
 
-            logger.LogInformation("Seeded {Count} configuration values from appsettings.json", seededCount);
+            logger.LogInformation("=== Configuration Seeding Complete ===");
+            logger.LogInformation("Seeded: {SeededCount}, Skipped: {SkippedCount}, Errors: {ErrorCount}", 
+                seededCount, skippedCount, errorCount);
+            
             return services;
         }
 
@@ -76,8 +106,58 @@ namespace AzureGateway.Api.Extensions
             var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
             var logger = scope.ServiceProvider.GetRequiredService<ILogger<ApplicationDbContext>>();
 
-            await DatabaseInitializer.InitializeAsync(context, logger);
+            logger.LogInformation("=== Starting Database Initialization ===");
+            
+            try
+            {
+                await DatabaseInitializer.InitializeAsync(context, logger);
+                logger.LogInformation("Database initialization completed successfully");
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Database initialization failed");
+                throw;
+            }
+
             return services;
+        }
+
+        public static async Task<bool> ValidateAzureConfigurationAsync(this IServiceProvider services)
+        {
+            using var scope = services.CreateScope();
+            var configService = scope.ServiceProvider.GetRequiredService<IConfigurationService>();
+            var logger = scope.ServiceProvider.GetRequiredService<ILogger<IServiceProvider>>();
+
+            logger.LogInformation("=== Validating Azure Configuration ===");
+            
+            try
+            {
+                var connectionString = await configService.GetValueAsync("Azure.StorageConnectionString");
+                if (string.IsNullOrEmpty(connectionString))
+                {
+                    logger.LogWarning("Azure Storage connection string is not configured");
+                    return false;
+                }
+
+                logger.LogInformation("Azure Storage connection string found");
+                
+                // Check if it's a valid connection string format
+                if (connectionString.Contains("AccountName=") && connectionString.Contains("AccountKey="))
+                {
+                    logger.LogInformation("Azure Storage connection string format appears valid");
+                    return true;
+                }
+                else
+                {
+                    logger.LogWarning("Azure Storage connection string format appears invalid");
+                    return false;
+                }
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Error validating Azure configuration");
+                return false;
+            }
         }
     }
 }
