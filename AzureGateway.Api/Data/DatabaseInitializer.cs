@@ -83,7 +83,9 @@ namespace AzureGateway.Api.Data
                     SourceType = DataSource.Folder,
                     IsEnabled = true,
                     FolderPath = "C:\\workspace\\PineSageProjects\\incoming",
-                    FilePattern = "*.{json,jpg,jpeg,png}",
+                    // Note: FileSystemWatcher does not support brace patterns like "*.{json,jpg,jpeg,png}"
+                    // Use "*.*" by default to match all files; narrow to "*.json" or similar as needed.
+                    FilePattern = "*.*",
                     PollingIntervalMinutes = 1,
                     CreatedAt = DateTime.UtcNow
                 },

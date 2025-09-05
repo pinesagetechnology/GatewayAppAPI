@@ -22,11 +22,11 @@ namespace AzureGateway.Api.Controllers
         }
 
         [HttpGet("status")]
-        public async Task<IActionResult> GetStatus()
+        public IActionResult GetStatus()
         {
             try
             {
-                var status = await _monitoringService.GetStatusAsync();
+                var status = _monitoringService.GetStatusAsync();
                 return Ok(status);
             }
             catch (Exception ex)

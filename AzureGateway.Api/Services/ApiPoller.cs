@@ -46,6 +46,7 @@ namespace AzureGateway.Api.Services
             try
             {
                 if (_isRunning) return;
+                _logger.LogInformation("Starting API poller for endpoint: {Endpoint}", _config.ApiEndpoint);
 
                 if (string.IsNullOrEmpty(_config.ApiEndpoint))
                 {

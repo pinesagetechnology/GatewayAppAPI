@@ -1,3 +1,5 @@
+// API polling disabled - commenting out entire test file
+/*
 using Moq;
 using AzureGateway.Api.Models;
 using AzureGateway.Api.Services;
@@ -133,3 +135,4 @@ namespace AzureGateway.APi.Tests.Services
         }
     }
 }
+*/

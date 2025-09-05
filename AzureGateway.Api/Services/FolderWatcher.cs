@@ -165,8 +165,8 @@ namespace AzureGateway.Api.Services
 
                 _logger.LogInformation("Added file to upload queue: {FileName} (ID: {UploadId})", fileName, upload.Id);
 
-                // Move to archive after successful processing
-                await MoveToArchiveAsync(filePath, "processed");
+                // Note: Files are moved to archive by UploadProcessor after successful upload
+                // await MoveToArchiveAsync(filePath, "processed");
 
                 await _onFileProcessed(_config.Id, fileName);
             }
@@ -175,6 +175,9 @@ namespace AzureGateway.Api.Services
                 var error = $"Error processing file {filePath}: {ex.Message}";
                 await _onError(_config.Id, error);
                 _logger.LogError(ex, "Error processing file {FilePath}", filePath);
+                
+                // Archive failed files to prevent reprocessing
+                await MoveToArchiveAsync(filePath, "failed");
             }
             finally
             {

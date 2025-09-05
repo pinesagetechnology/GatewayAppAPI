@@ -27,6 +27,7 @@ namespace AzureGateway.Api.Extensions
             services.AddScoped<IUploadQueueService, UploadQueueService>();
             services.AddScoped<IDatabaseHealthService, DatabaseHealthService>();
             services.AddSingleton<IConfigurationService, ConfigurationService>();
+            services.AddSingleton<IApiPollingService, ApiPollingService>();
 
             return services;
         }

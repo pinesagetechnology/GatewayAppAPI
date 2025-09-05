@@ -44,7 +44,7 @@ namespace AzureGateway.Api.Controllers
                 
                 var db = await CheckDatabaseHealthAsync();
                 var storage = await CheckAzureStorageHealthAsync();
-                var monitoring = await CheckFileMonitoringHealthAsync();
+                var monitoring = CheckFileMonitoringHealthAsync();
 
                 // Compute UI-compatible flags
                 var isHealthy =
@@ -168,12 +168,12 @@ namespace AzureGateway.Api.Controllers
             }
         }
 
-        private async Task<object> CheckFileMonitoringHealthAsync()
+        private object CheckFileMonitoringHealthAsync()
         {
             _logger.LogDebug("Checking file monitoring health...");
             try
             {
-                var status = await _fileMonitoringService.GetStatusAsync();
+                var status = _fileMonitoringService.GetStatusAsync();
                 
                 _logger.LogDebug("File monitoring health check result: Running={Running}, FilesProcessed={FilesProcessed}", 
                     status.IsRunning, status.TotalFilesProcessed);

@@ -12,7 +12,6 @@ namespace AzureGateway.Api.Services
         private readonly IServiceProvider _serviceProvider;
         private readonly ILogger<FileMonitoringService> _logger;
         private readonly ConcurrentDictionary<int, IFolderWatcher> _folderWatchers = new();
-        private readonly ConcurrentDictionary<int, IApiPoller> _apiPollers = new();
         private readonly ConcurrentDictionary<int, DataSourceStatus> _sourceStatuses = new();
         private readonly Timer _refreshTimer;
         private bool _isRunning = false;
@@ -44,8 +43,8 @@ namespace AzureGateway.Api.Services
             {
                 await RefreshDataSourcesAsync();
                 _isRunning = true;
-                _logger.LogInformation("File monitoring service started with {FolderWatchers} folder watchers and {ApiPollers} API pollers",
-                    _folderWatchers.Count, _apiPollers.Count);
+                _logger.LogInformation("File monitoring service started with {FolderWatchers} folder watchers",
+                    _folderWatchers.Count);
             }
             catch (Exception ex)
             {
@@ -77,21 +76,7 @@ namespace AzureGateway.Api.Services
                 }
             }
 
-            // Stop all API pollers
-            foreach (var poller in _apiPollers.Values)
-            {
-                try
-                {
-                    await poller.StopAsync();
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "Error stopping API poller");
-                }
-            }
-
             _folderWatchers.Clear();
-            _apiPollers.Clear();
             _sourceStatuses.Clear();
             _isRunning = false;
 
@@ -103,14 +88,13 @@ namespace AzureGateway.Api.Services
             return Task.FromResult(_isRunning);
         }
 
-        public async Task<FileMonitoringStatus> GetStatusAsync()
+        public FileMonitoringStatus GetStatusAsync()
         {
             return new FileMonitoringStatus
             {
                 IsRunning = _isRunning,
                 StartedAt = _startedAt,
                 ActiveFolderWatchers = _folderWatchers.Count,
-                ActiveApiPollers = _apiPollers.Count,
                 TotalFilesProcessed = _totalFilesProcessed,
                 LastFileProcessed = _sourceStatuses.Values.Max(s => s.LastActivity),
                 DataSources = _sourceStatuses.Values.ToList()
@@ -133,8 +117,6 @@ namespace AzureGateway.Api.Services
                 // Update folder watchers
                 await UpdateFolderWatchersAsync(dataSources.Where(ds => ds.SourceType == DataSource.Folder));
 
-                // Update API pollers
-                await UpdateApiPollersAsync(dataSources.Where(ds => ds.SourceType == DataSource.Api));
             }
             catch (Exception ex)
             {
@@ -161,6 +143,13 @@ namespace AzureGateway.Api.Services
             // Add/update active watchers
             foreach (var source in folderSources)
             {
+                // Safety check: ensure this is a Folder source before creating a watcher
+                if (source.SourceType != DataSource.Folder)
+                {
+                    _logger.LogDebug("Skipping non-Folder data source {Id} ({Type}) in file monitoring", source.Id, source.SourceType);
+                    continue;
+                }
+
                 if (!_folderWatchers.ContainsKey(source.Id))
                 {
                     var watcher = new FolderWatcher(source, _serviceProvider, OnFileProcessed, OnError);
@@ -177,45 +166,6 @@ namespace AzureGateway.Api.Services
                     await watcher.StartAsync();
                     _sourceStatuses[source.Id].IsActive = true;
                     _logger.LogInformation("Started folder watcher for {Name} at {Path}", source.Name, source.FolderPath);
-                }
-            }
-        }
-
-        private async Task UpdateApiPollersAsync(IEnumerable<DataSourceConfig> apiSources)
-        {
-            var currentIds = apiSources.Select(ds => ds.Id).ToHashSet();
-            var existingIds = _apiPollers.Keys.ToHashSet();
-
-            // Remove stopped/disabled pollers
-            foreach (var id in existingIds.Except(currentIds))
-            {
-                if (_apiPollers.TryRemove(id, out var poller))
-                {
-                    await poller.StopAsync();
-                    _sourceStatuses.TryRemove(id, out _);
-                    _logger.LogInformation("Stopped API poller for data source {Id}", id);
-                }
-            }
-
-            // Add/update active pollers
-            foreach (var source in apiSources)
-            {
-                if (!_apiPollers.ContainsKey(source.Id))
-                {
-                    var poller = new ApiPoller(source, _serviceProvider, OnFileProcessed, OnError);
-                    _apiPollers[source.Id] = poller;
-                    _sourceStatuses[source.Id] = new DataSourceStatus
-                    {
-                        Id = source.Id,
-                        Name = source.Name,
-                        Type = source.SourceType,
-                        IsEnabled = source.IsEnabled,
-                        IsActive = false
-                    };
-
-                    await poller.StartAsync();
-                    _sourceStatuses[source.Id].IsActive = true;
-                    _logger.LogInformation("Started API poller for {Name} at {Endpoint}", source.Name, source.ApiEndpoint);
                 }
             }
         }

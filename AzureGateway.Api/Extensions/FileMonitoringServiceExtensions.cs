@@ -13,6 +13,9 @@ namespace AzureGateway.Api.Extensions
             // Register hosted service to manage file monitoring lifecycle
             services.AddHostedService<FileMonitoringHostedService>();
 
+            // Register API polling hosted service (auto-start controlled by config)
+            services.AddHostedService<AzureGateway.Api.HostedServices.ApiPollingHostedService>();
+
             return services;
         }
     }
