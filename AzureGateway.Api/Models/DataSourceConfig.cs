@@ -37,4 +37,17 @@ namespace AzureGateway.Api.Models
         [StringLength(1000)]
         public string? AdditionalSettings { get; set; } // JSON for extra configs
     }
+
+    public class DataSourceStatus
+    {
+        public int Id { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public DataSource Type { get; set; }
+        public bool IsEnabled { get; set; }
+        public bool IsActive { get; set; }
+        public DateTime? LastActivity { get; set; }
+        public long FilesProcessed { get; set; }
+        public string? LastError { get; set; }
+        public DateTime? LastErrorAt { get; set; }
+    }
 }

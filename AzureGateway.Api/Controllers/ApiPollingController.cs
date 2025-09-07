@@ -17,11 +17,11 @@ namespace AzureGateway.Api.Controllers
         }
 
         [HttpGet("status")]
-        public IActionResult GetStatus()
+        public async Task<IActionResult> GetStatus()
         {
             try
             {
-                var status = _pollingService.GetStatusAsync();
+                var status = await _pollingService.GetStatusAsync();
                 return Ok(status);
             }
             catch (Exception ex)
@@ -58,6 +58,36 @@ namespace AzureGateway.Api.Controllers
             {
                 _logger.LogError(ex, "Failed to stop API polling");
                 return StatusCode(500, new { Error = "Failed to stop API polling", Details = ex.Message });
+            }
+        }
+
+        [HttpPost("start/{dataSourceId}")]
+        public async Task<IActionResult> StartDataSource(int dataSourceId)
+        {
+            try
+            {
+                await _pollingService.StartDataSourceAsync(dataSourceId);
+                return Ok(new { Message = $"API polling started for data source {dataSourceId}" });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to start API polling for data source {DataSourceId}", dataSourceId);
+                return StatusCode(500, new { Error = "Failed to start API polling for data source", Details = ex.Message });
+            }
+        }
+
+        [HttpPost("stop/{dataSourceId}")]
+        public async Task<IActionResult> StopDataSource(int dataSourceId)
+        {
+            try
+            {
+                await _pollingService.StopDataSourceAsync(dataSourceId);
+                return Ok(new { Message = $"API polling stopped for data source {dataSourceId}" });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to stop API polling for data source {DataSourceId}", dataSourceId);
+                return StatusCode(500, new { Error = "Failed to stop API polling for data source", Details = ex.Message });
             }
         }
 

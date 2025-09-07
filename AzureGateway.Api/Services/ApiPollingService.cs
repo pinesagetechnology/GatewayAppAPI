@@ -65,17 +65,142 @@ namespace AzureGateway.Api.Services
 
         public Task<bool> IsRunningAsync() => Task.FromResult(_isRunning);
 
-        public ApiPollingStatus GetStatusAsync()
+        public async Task<ApiPollingStatus> GetStatusAsync()
         {
-            return new ApiPollingStatus
+            try
             {
-                IsRunning = _isRunning,
-                StartedAt = _startedAt,
-                ActiveApiPollers = _pollers.Count,
-                TotalItemsProcessed = _totalItemsProcessed,
-                LastActivity = _sourceStatuses.Values.Max(s => s.LastActivity),
-                DataSources = _sourceStatuses.Values.ToList()
-            };
+                using var scope = _serviceProvider.CreateScope();
+                var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+                // Get all API data sources from database
+                var apiSources = await context.DataSourceConfigs
+                    .Where(ds => ds.SourceType == DataSource.Api)
+                    .ToListAsync();
+
+                // Create status list from database
+                var dataSourceStatuses = new List<DataSourceStatus>();
+                
+                foreach (var source in apiSources)
+                {
+                    var status = new DataSourceStatus
+                    {
+                        Id = source.Id,
+                        Name = source.Name,
+                        Type = source.SourceType,
+                        IsEnabled = source.IsEnabled,
+                        IsActive = _pollers.ContainsKey(source.Id), // Active if currently polling
+                        LastActivity = source.LastProcessedAt,
+                        FilesProcessed = 0, // Could be tracked separately if needed
+                        LastError = null,
+                        LastErrorAt = null
+                    };
+
+                    // Update with in-memory status if available (for runtime stats)
+                    if (_sourceStatuses.TryGetValue(source.Id, out var inMemoryStatus))
+                    {
+                        status.LastActivity = inMemoryStatus.LastActivity ?? source.LastProcessedAt;
+                        status.FilesProcessed = inMemoryStatus.FilesProcessed;
+                        status.LastError = inMemoryStatus.LastError;
+                        status.LastErrorAt = inMemoryStatus.LastErrorAt;
+                    }
+
+                    dataSourceStatuses.Add(status);
+                }
+
+                return new ApiPollingStatus
+                {
+                    IsRunning = _isRunning,
+                    StartedAt = _startedAt,
+                    ActiveApiPollers = _pollers.Count,
+                    TotalItemsProcessed = _totalItemsProcessed,
+                    LastActivity = dataSourceStatuses.Any() ? dataSourceStatuses.Max(s => s.LastActivity) : null,
+                    DataSources = dataSourceStatuses
+                };
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to get API polling status from database");
+                // Fallback to basic status
+                return new ApiPollingStatus
+                {
+                    IsRunning = _isRunning,
+                    StartedAt = _startedAt,
+                    ActiveApiPollers = _pollers.Count,
+                    TotalItemsProcessed = _totalItemsProcessed,
+                    LastActivity = null,
+                    DataSources = new List<DataSourceStatus>()
+                };
+            }
+        }
+
+        public async Task StartDataSourceAsync(int dataSourceId)
+        {
+            try
+            {
+                using var scope = _serviceProvider.CreateScope();
+                var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+                var dataSource = await context.DataSourceConfigs
+                    .FirstOrDefaultAsync(ds => ds.Id == dataSourceId && ds.SourceType == DataSource.Api);
+
+                if (dataSource == null)
+                {
+                    _logger.LogWarning("Data source {DataSourceId} not found or not an API source", dataSourceId);
+                    return;
+                }
+
+                // Update database to enable the data source
+                dataSource.IsEnabled = true;
+                await context.SaveChangesAsync();
+
+                // Start the poller if service is running
+                if (_isRunning)
+                {
+                    await UpdateApiPollersAsync(new[] { dataSource });
+                }
+
+                _logger.LogInformation("Started API polling for data source {DataSourceId}: {Name}", dataSourceId, dataSource.Name);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to start API polling for data source {DataSourceId}", dataSourceId);
+                throw;
+            }
+        }
+
+        public async Task StopDataSourceAsync(int dataSourceId)
+        {
+            try
+            {
+                using var scope = _serviceProvider.CreateScope();
+                var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+                var dataSource = await context.DataSourceConfigs
+                    .FirstOrDefaultAsync(ds => ds.Id == dataSourceId && ds.SourceType == DataSource.Api);
+
+                if (dataSource == null)
+                {
+                    _logger.LogWarning("Data source {DataSourceId} not found or not an API source", dataSourceId);
+                    return;
+                }
+
+                // Update database to disable the data source
+                dataSource.IsEnabled = false;
+                await context.SaveChangesAsync();
+
+                // Stop the poller if it's running
+                if (_pollers.TryRemove(dataSourceId, out var poller))
+                {
+                    await poller.StopAsync();
+                    _sourceStatuses.TryRemove(dataSourceId, out _);
+                    _logger.LogInformation("Stopped API poller for data source {DataSourceId}: {Name}", dataSourceId, dataSource.Name);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to stop API polling for data source {DataSourceId}", dataSourceId);
+                throw;
+            }
         }
 
         public async Task RefreshDataSourcesAsync()

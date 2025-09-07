@@ -109,7 +109,7 @@ namespace AzureGateway.Api.Services
                 var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
 
                 var dataSources = await context.DataSourceConfigs
-                    .Where(ds => ds.IsEnabled)
+                    .Where(ds => ds.IsEnabled && ds.SourceType == DataSource.Folder)
                     .ToListAsync();
 
                 _logger.LogDebug("Refreshing {Count} enabled data sources", dataSources.Count);

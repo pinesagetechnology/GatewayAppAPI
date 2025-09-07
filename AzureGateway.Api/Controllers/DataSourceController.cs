@@ -15,15 +15,18 @@ namespace AzureGateway.Api.Controllers
     {
         private readonly ApplicationDbContext _context;
         private readonly IFileMonitoringService _monitoringService;
+        private readonly IApiPollingService _apiPollingService;
         private readonly ILogger<DataSourceController> _logger;
 
         public DataSourceController(
             ApplicationDbContext context,
             IFileMonitoringService monitoringService,
+            IApiPollingService apiPollingService,
             ILogger<DataSourceController> logger)
         {
             _context = context;
             _monitoringService = monitoringService;
+            _apiPollingService = apiPollingService;
             _logger = logger;
         }
 
@@ -97,9 +100,14 @@ namespace AzureGateway.Api.Controllers
                 await _context.SaveChangesAsync();
 
                 // Refresh monitoring service if it's running
-                if (await _monitoringService.IsRunningAsync())
+                if (dataSource.SourceType == DataSource.Folder && await _monitoringService.IsRunningAsync())
                 {
                     await _monitoringService.RefreshDataSourcesAsync();
+                }
+
+                if (dataSource.SourceType == DataSource.Api && await _apiPollingService.IsRunningAsync())
+                {
+                    await _apiPollingService.RefreshDataSourcesAsync();
                 }
 
                 _logger.LogInformation("Created data source: {Name} (ID: {Id})", dataSource.Name, dataSource.Id);
@@ -133,9 +141,14 @@ namespace AzureGateway.Api.Controllers
                 await _context.SaveChangesAsync();
 
                 // Refresh monitoring service
-                if (await _monitoringService.IsRunningAsync())
+                if (dataSource.SourceType == DataSource.Folder && await _monitoringService.IsRunningAsync())
                 {
                     await _monitoringService.RefreshDataSourcesAsync();
+                }
+
+                if(dataSource.SourceType == DataSource.Api && await _apiPollingService.IsRunningAsync())
+                {
+                    await _apiPollingService.RefreshDataSourcesAsync();
                 }
 
                 _logger.LogInformation("Updated data source: {Name} (ID: {Id})", dataSource.Name, dataSource.Id);
@@ -161,9 +174,14 @@ namespace AzureGateway.Api.Controllers
                 await _context.SaveChangesAsync();
 
                 // Refresh monitoring service
-                if (await _monitoringService.IsRunningAsync())
+                if (dataSource.SourceType == DataSource.Folder && await _monitoringService.IsRunningAsync())
                 {
                     await _monitoringService.RefreshDataSourcesAsync();
+                }
+
+                if (dataSource.SourceType == DataSource.Api && await _apiPollingService.IsRunningAsync())
+                {
+                    await _apiPollingService.RefreshDataSourcesAsync();
                 }
 
                 _logger.LogInformation("Deleted data source: {Name} (ID: {Id})", dataSource.Name, dataSource.Id);
@@ -189,9 +207,14 @@ namespace AzureGateway.Api.Controllers
                 await _context.SaveChangesAsync();
 
                 // Refresh monitoring service
-                if (await _monitoringService.IsRunningAsync())
+                if (dataSource.SourceType == DataSource.Folder && await _monitoringService.IsRunningAsync())
                 {
                     await _monitoringService.RefreshDataSourcesAsync();
+                }
+
+                if (dataSource.SourceType == DataSource.Api && await _apiPollingService.IsRunningAsync())
+                {
+                    await _apiPollingService.RefreshDataSourcesAsync();
                 }
 
                 var status = dataSource.IsEnabled ? "enabled" : "disabled";

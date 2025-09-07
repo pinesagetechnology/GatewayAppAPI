@@ -59,6 +59,10 @@ namespace AzureGateway.Api.Data
                     logger.LogInformation("Data source configurations already exist, skipping seeding");
                 }
 
+                // Seed essential configuration values
+                logger.LogInformation("Seeding essential configuration values...");
+                await SeedEssentialConfigurationsAsync(context, logger);
+
                 // Log database statistics
                 await LogDatabaseStatisticsAsync(context, logger);
 
@@ -93,8 +97,8 @@ namespace AzureGateway.Api.Data
                 {
                     Name = "Third Party API",
                     SourceType = DataSource.Api,
-                    IsEnabled = false,
-                    ApiEndpoint = "https://api.example.com/data",
+                    IsEnabled = true,
+                    ApiEndpoint = "",
                     PollingIntervalMinutes = 5,
                     CreatedAt = DateTime.UtcNow,
                     AdditionalSettings = "{\"headers\": {\"Accept\": \"application/json\"}}"
@@ -196,6 +200,53 @@ namespace AzureGateway.Api.Data
             catch (Exception ex)
             {
                 logger.LogWarning(ex, "Could not retrieve database statistics");
+            }
+        }
+
+        private static async Task SeedEssentialConfigurationsAsync(ApplicationDbContext context, ILogger logger)
+        {
+            logger.LogInformation("Seeding essential configuration values...");
+            
+            var essentialConfigs = new[]
+            {
+                new Models.Configuration
+                {
+                    Key = "ApiPolling.AutoStart",
+                    Value = "true",
+                    Description = "Automatically start API polling service on application startup",
+                    Category = "ApiPolling",
+                    UpdatedAt = DateTime.UtcNow
+                }
+            };
+
+            var seededCount = 0;
+            var skippedCount = 0;
+
+            foreach (var config in essentialConfigs)
+            {
+                var exists = await context.Configuration.AnyAsync(c => c.Key == config.Key);
+                if (!exists)
+                {
+                    context.Configuration.Add(config);
+                    seededCount++;
+                    logger.LogDebug("Seeded essential configuration: {Key} = {Value}", config.Key, config.Value);
+                }
+                else
+                {
+                    skippedCount++;
+                    logger.LogDebug("Essential configuration already exists: {Key}", config.Key);
+                }
+            }
+
+            if (seededCount > 0)
+            {
+                await context.SaveChangesAsync();
+                logger.LogInformation("Successfully seeded {Count} essential configuration values", seededCount);
+            }
+            
+            if (skippedCount > 0)
+            {
+                logger.LogInformation("Skipped {Count} existing essential configuration values", skippedCount);
             }
         }
     }
