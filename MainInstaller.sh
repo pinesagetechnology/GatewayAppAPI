@@ -10,6 +10,7 @@ SOURCE_PATH=""
 SKIP_DOTNET=false
 SKIP_VALIDATION=false
 VERBOSE=false
+REPO_URL=""
 
 # Colors
 RED='\033[0;31m'
@@ -33,6 +34,10 @@ while [[ $# -gt 0 ]]; do
             SOURCE_PATH="$2"
             shift 2
             ;;
+        --repo-url)
+            REPO_URL="$2"
+            shift 2
+            ;;
         --skip-dotnet)
             SKIP_DOTNET=true
             shift
@@ -52,7 +57,8 @@ while [[ $# -gt 0 ]]; do
             echo "Options:"
             echo "  --install-path PATH    Installation directory (default: /opt/azuregateway)"
             echo "  --data-path PATH       Data directory (default: /var/azuregateway)"
-            echo "  --source-path PATH     Path to published application files"
+            echo "  --source-path PATH     Path to published application files (or clone dest)"
+            echo "  --repo-url URL         Git repository URL to clone if source path missing"
             echo "  --skip-dotnet         Skip .NET installation"
             echo "  --skip-validation     Skip post-installation validation"
             echo "  --verbose             Verbose output"
@@ -77,7 +83,7 @@ echo ""
 echo "Configuration:"
 echo "  Install Path: $INSTALL_PATH"
 echo "  Data Path: $DATA_PATH"
-echo "  Source Path: ${SOURCE_PATH:-'Not specified (manual deployment)'}"
+echo "  Source Path: ${SOURCE_PATH:-'Not specified (will prompt to clone or skip)'}"
 echo ""
 
 # Check if running as root
@@ -101,7 +107,47 @@ fi
 
 log_info "Prerequisites installation completed"
 
-# Step 2: Deploy application if source provided
+# Step 2: Obtain source (prompt to clone if needed) and deploy application
+if [ -z "$SOURCE_PATH" ]; then
+    log_step "Step 2: Source path not provided"
+    read -r -p "Do you want to clone the repository now? (y/n) [y]: " CLONE_CHOICE
+    CLONE_CHOICE=${CLONE_CHOICE:-y}
+    if [ "$CLONE_CHOICE" = "y" ] || [ "$CLONE_CHOICE" = "Y" ]; then
+        if [ -z "$REPO_URL" ]; then
+            read -r -p "Enter Git repository URL: " REPO_URL
+        fi
+        if [ -z "$REPO_URL" ]; then
+            log_error "Repository URL is required to clone. Aborting."
+            exit 1
+        fi
+        read -r -p "Enter destination path to clone into: " SOURCE_PATH
+        if [ -z "$SOURCE_PATH" ]; then
+            log_error "Destination path is required. Aborting."
+            exit 1
+        fi
+        log_step "Cloning $REPO_URL to $SOURCE_PATH"
+        if ! command -v git >/dev/null 2>&1; then
+            log_warn "git not found. Attempting to install git."
+            if command -v apt-get >/dev/null 2>&1; then
+                sudo apt-get update && sudo apt-get install -y git || true
+            elif command -v dnf >/dev/null 2>&1; then
+                sudo dnf install -y git || true
+            elif command -v yum >/dev/null 2>&1; then
+                sudo yum install -y git || true
+            fi
+        fi
+        if ! command -v git >/dev/null 2>&1; then
+            log_error "git is required to clone the repository. Install git and retry."
+            exit 1
+        fi
+        mkdir -p "$(dirname "$SOURCE_PATH")"
+        git clone "$REPO_URL" "$SOURCE_PATH"
+        log_info "Repository cloned."
+    else
+        log_step "Skipping clone; proceeding without source deployment"
+    fi
+fi
+
 if [ -n "$SOURCE_PATH" ]; then
     log_step "Step 2: Deploying application files"
     if [ ! -d "$SOURCE_PATH" ]; then
