@@ -177,11 +177,28 @@ install_dotnet8() {
             ;;
     esac
     
-    # Verify installation
+    # Verify installation via package manager; if not found, fallback to dotnet-install.sh
     if check_dotnet8; then
         log_info ".NET 8 installed successfully"
+        return 0
+    fi
+
+    log_warn "ASP.NET Core 8 runtime not found via package manager. Falling back to dotnet-install.sh"
+    # Use Microsoft's install script to install ASP.NET Core runtime system-wide
+    if command -v curl &> /dev/null; then
+        curl -sSL https://dot.net/v1/dotnet-install.sh -o /tmp/dotnet-install.sh
     else
-        log_error "Failed to verify .NET 8 installation"
+        wget -q https://dot.net/v1/dotnet-install.sh -O /tmp/dotnet-install.sh
+    fi
+    chmod +x /tmp/dotnet-install.sh
+    /tmp/dotnet-install.sh --runtime aspnetcore --channel 8.0 --install-dir /usr/share/dotnet
+    ln -sf /usr/share/dotnet/dotnet /usr/bin/dotnet || true
+
+    # Verify installation after fallback
+    if check_dotnet8; then
+        log_info ".NET 8 installed successfully (via dotnet-install.sh)"
+    else
+        log_error "Failed to verify .NET 8 installation after fallback"
         exit 1
     fi
 }
