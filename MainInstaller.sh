@@ -89,9 +89,9 @@ fi
 # Step 1: Run prerequisites installation
 log_step "Step 1: Installing prerequisites and setting up environment"
 if [ "$SKIP_DOTNET" = true ]; then
-    bash install.sh --install-path "$INSTALL_PATH" --data-path "$DATA_PATH" --skip-dotnet
+    bash Linux_Installation.sh --install-path "$INSTALL_PATH" --data-path "$DATA_PATH" --skip-dotnet
 else
-    bash install.sh --install-path "$INSTALL_PATH" --data-path "$DATA_PATH"
+    bash Linux_Installation.sh --install-path "$INSTALL_PATH" --data-path "$DATA_PATH"
 fi
 
 if [ $? -ne 0 ]; then
