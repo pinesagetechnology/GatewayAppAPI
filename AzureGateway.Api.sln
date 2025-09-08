@@ -7,6 +7,14 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AzureGateway.Api", "AzureGa
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AzureGateway.APi.Tests", "AzureGateway.APi.Tests\AzureGateway.APi.Tests.csproj", "{431EDAD9-1FDE-450D-817C-F3CCA4BFB0A9}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Scripts", "Scripts", "{02EA681E-C7D8-13C7-8484-4AC65E1B71E8}"
+	ProjectSection(SolutionItems) = preProject
+		Linux_Installation.sh = Linux_Installation.sh
+		MainInstaller.ps1 = MainInstaller.ps1
+		MainInstaller.sh = MainInstaller.sh
+		Windows_Istallation.ps1 = Windows_Istallation.ps1
+	EndProjectSection
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
