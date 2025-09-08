@@ -88,6 +88,11 @@ fi
 
 # Step 1: Run prerequisites installation
 log_step "Step 1: Installing prerequisites and setting up environment"
+# Normalize potential CRLF in Linux_Installation.sh to avoid shebang issues
+if [ -f "Linux_Installation.sh" ]; then
+    sed -i 's/\r$//' Linux_Installation.sh || true
+    chmod +x Linux_Installation.sh || true
+fi
 if [ "$SKIP_DOTNET" = true ]; then
     bash Linux_Installation.sh --install-path "$INSTALL_PATH" --data-path "$DATA_PATH" --skip-dotnet
 else
@@ -188,6 +193,39 @@ if [ -n "$SOURCE_PATH" ]; then
     chown -R azuregateway:azuregateway "$INSTALL_PATH"
     chmod +x "$INSTALL_PATH"/*.dll || true
     log_info "Application files deployed"
+
+    # Step 2b: Ensure systemd service exists after deployment
+    SERVICE_NAME="azuregateway"
+    if [ ! -f "/etc/systemd/system/$SERVICE_NAME.service" ]; then
+        log_step "Creating systemd service..."
+        cat > "/etc/systemd/system/$SERVICE_NAME.service" << EOF
+[Unit]
+Description=Azure Gateway API Service
+After=network.target
+
+[Service]
+Type=simple
+User=azuregateway
+Group=azuregateway
+WorkingDirectory=$INSTALL_PATH
+ExecStart=/usr/bin/dotnet $INSTALL_PATH/AzureGateway.Api.dll
+Restart=always
+RestartSec=10
+KillSignal=SIGINT
+SyslogIdentifier=$SERVICE_NAME
+Environment=ASPNETCORE_ENVIRONMENT=Production
+Environment=DOTNET_PRINT_TELEMETRY_MESSAGE=false
+
+[Install]
+WantedBy=multi-user.target
+EOF
+        systemctl daemon-reload
+        systemctl enable "$SERVICE_NAME" || true
+        log_info "Systemd service created and enabled"
+    else
+        log_step "Systemd service already exists"
+        systemctl daemon-reload
+    fi
 else
     log_step "Step 2: Application deployment skipped"
     log_warn "No source path provided. You need to manually deploy the application:"
