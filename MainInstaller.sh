@@ -77,7 +77,7 @@ echo ""
 echo "Configuration:"
 echo "  Install Path: $INSTALL_PATH"
 echo "  Data Path: $DATA_PATH"
-echo "  Source Path: ${SOURCE_PATH:-'Not specified (will prompt)'}"
+echo "  Source Path: ${SOURCE_PATH:-'Auto-detect next to this script'}"
 echo ""
 
 # Check if running as root
@@ -101,18 +101,20 @@ fi
 
 log_info "Prerequisites installation completed"
 
-# Step 2: Ask for source path if not supplied and deploy application
+# Step 2: Auto-detect source path relative to this script when not supplied, then deploy
 if [ -z "$SOURCE_PATH" ]; then
-    log_step "Step 2: Source path not provided"
-    read -r -p "Enter path to published application files (leave empty to skip deployment): " SOURCE_PATH
+    SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+    if [ -d "$SCRIPT_DIR/AzureGateway.Api" ]; then
+        SOURCE_PATH="$SCRIPT_DIR/AzureGateway.Api"
+    else
+        SOURCE_PATH="$SCRIPT_DIR"
+    fi
 fi
 
-# Normalize source path (expand ~ and make absolute) if provided
-if [ -n "$SOURCE_PATH" ]; then
-    SOURCE_PATH=$(eval echo "$SOURCE_PATH")
-    if command -v realpath >/dev/null 2>&1; then
-        SOURCE_PATH=$(realpath -m "$SOURCE_PATH")
-    fi
+# Normalize source path (expand ~ and make absolute)
+SOURCE_PATH=$(eval echo "$SOURCE_PATH")
+if command -v realpath >/dev/null 2>&1; then
+    SOURCE_PATH=$(realpath -m "$SOURCE_PATH")
 fi
 
 if [ -n "$SOURCE_PATH" ]; then
