@@ -386,9 +386,7 @@ try {
     Write-Host "=== Installation Summary ===" -ForegroundColor Green
     if ($InstallPath) { Write-Host "Install Path: $InstallPath" -ForegroundColor Yellow }
     if ($DataPath) { Write-Host "Data Path: $DataPath" -ForegroundColor Yellow }
-    if ($IncomingPath) { Write-Host "Incoming Path: $IncomingPath" -ForegroundColor Yellow }
-    if ($ArchivePath) { Write-Host "Archive Path: $ArchivePath" -ForegroundColor Yellow }
-    if ($TempPath) { Write-Host "Temp Path: $TempPath" -ForegroundColor Yellow }
+    # Additional path outputs omitted unless defined elsewhere
     Write-Host "Service: AzureGatewayAPI" -ForegroundColor Yellow
     Write-Host ""
     Write-Host "Next Steps:" -ForegroundColor Cyan

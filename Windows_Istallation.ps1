@@ -108,7 +108,7 @@ function Update-ConfigurationFiles {
         "$AppPath\appsettings.Development.json"
     )
     
-    $dbPath = "$DataBasePath\database\databasegateway.db".Replace('\', '\\')
+    $dbPath = "$DataBasePath\database\gateway.db".Replace('\', '\\')
     $tempPath = "$DataBasePath\temp\api-data".Replace('\', '\\')
     $incomingPath = "$DataBasePath\incoming".Replace('\', '\\')
     $archivePath = "$DataBasePath\archive".Replace('\', '\\')
@@ -140,14 +140,22 @@ function Install-WindowsService {
     # Check if service already exists
     if (Get-Service -Name $ServiceName -ErrorAction SilentlyContinue) {
         Write-Host "Service $ServiceName already exists. Stopping..." -ForegroundColor Yellow
-        Stop-Service -Name $ServiceName -Force
-        Remove-Service -Name $ServiceName
+        try { Stop-Service -Name $ServiceName -Force -ErrorAction SilentlyContinue } catch {}
+        if (Get-Command Remove-Service -ErrorAction SilentlyContinue) {
+            try { Remove-Service -Name $ServiceName -ErrorAction SilentlyContinue } catch {}
+        } else {
+            sc.exe delete $ServiceName | Out-Null
+        }
     }
     
-    # Create service
+    # Create service using dotnet host for the DLL
+    $dotnetPath = (Get-Command dotnet).Source
+    $dllPath = Join-Path $AppPath 'AzureGateway.Api.dll'
+    $binaryPath = '"' + $dotnetPath + '" ' + '"' + $dllPath + '"'
+
     $serviceArgs = @{
         Name = $ServiceName
-        BinaryPathName = "`"$AppPath\AzureGateway.Api.exe`""
+        BinaryPathName = $binaryPath
         DisplayName = "Azure Gateway API Service"
         Description = "Azure Gateway API - File monitoring and upload service"
         StartupType = "Automatic"
@@ -224,7 +232,7 @@ try {
     }
     
     # Create directory structure
-    New-DirectoryStructure -InstallDir $InstallPath -DataDir $DataPath -IncomingDir $IncomingPath -ArchiveDir $ArchivePath -TempDir $TempPath
+    New-DirectoryStructure -BasePath $InstallPath -DataBasePath $DataPath
     
     # Check if application files exist
     if (!(Test-Path "$InstallPath\AzureGateway.Api.dll")) {
@@ -234,7 +242,7 @@ try {
     }
     
     # Update configuration files
-    Update-ConfigurationFiles -AppPath $InstallPath -DatabasePath $DataPath -IncomingDir $IncomingPath -ArchiveDir $ArchivePath -TempDir $TempPath
+    Update-ConfigurationFiles -AppPath $InstallPath -DataBasePath $DataPath
     
     # Set permissions
     Set-DirectoryPermissions -Path $DataPath
@@ -252,10 +260,7 @@ try {
     Write-Host ""
     Write-Host "=== Installation Complete ===" -ForegroundColor Green
     Write-Host "Application Path: $InstallPath" -ForegroundColor Yellow
-    Write-Host "Database Path: $DataPath\database\databasegateway.db" -ForegroundColor Yellow
-    Write-Host "Incoming Path: $IncomingPath" -ForegroundColor Yellow
-    Write-Host "Archive Path: $ArchivePath" -ForegroundColor Yellow
-    Write-Host "Temp Path: $TempPath" -ForegroundColor Yellow
+    Write-Host "Database Path: $DataPath\database\gateway.db" -ForegroundColor Yellow
     Write-Host "Logs: $InstallPath\logs\" -ForegroundColor Yellow
     Write-Host ""
     Write-Host "Next Steps:" -ForegroundColor Cyan

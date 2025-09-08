@@ -1,15 +1,4 @@
-﻿# Function to create startup script
-create_startup_script() {
-    cat > "$INSTALL_PATH/start.sh" << EOF
-#!/bin/bash
-cd "$INSTALL_PATH"
-echo "Starting Azure Gateway API..."
-dotnet AzureGateway.Api.dll
-EOF
-
-    chmod +x "$INSTALL_PATH/start.sh"
-    chown "$SERVICE_USER:$SERVICE_USER" "$INSTALL_PATH/start.sh"
-    #!/bin/bash
+﻿#!/bin/bash
 
 # Azure Gateway API - Linux Installation Script
 # This script installs prerequisites and sets up the Azure Gateway API on Linux
@@ -257,7 +246,7 @@ update_config_files() {
             cp "$config_file" "$config_file.backup"
             
             # Update paths using sed
-            sed -i "s|\"Data Source=.*\"|\"Data Source=$DATA_PATH/database/databasegateway.db\"|g" "$config_file"
+            sed -i "s|\"Data Source=.*\"|\"Data Source=$DATA_PATH/database/gateway.db\"|g" "$config_file"
             sed -i "s|\"TempDirectory\": \".*\"|\"TempDirectory\": \"$DATA_PATH/temp/api-data\"|g" "$config_file"
             sed -i "s|\"FolderPath\": \".*\"|\"FolderPath\": \"$DATA_PATH/incoming\"|g" "$config_file"
             sed -i "s|\"ArchivePath\": \".*\"|\"ArchivePath\": \"$DATA_PATH/archive\"|g" "$config_file"
@@ -277,7 +266,7 @@ Description=Azure Gateway API Service
 After=network.target
 
 [Service]
-Type=notify
+Type=simple
 User=$SERVICE_USER
 Group=$SERVICE_USER
 WorkingDirectory=$INSTALL_PATH
@@ -299,6 +288,39 @@ EOF
     
     log_info "Systemd service created and enabled"
 }
+# Function to create deployment guide
+create_deployment_guide() {
+    cat > "$INSTALL_PATH/DEPLOYMENT_GUIDE.txt" << EOF
+Azure Gateway API - Deployment Guide
+
+1) Publish application on a build machine:
+   dotnet publish -c Release -o publish
+
+2) Copy published files to the target machine:
+   sudo cp -r publish/* "$INSTALL_PATH/"
+   sudo chown -R $SERVICE_USER:$SERVICE_USER "$INSTALL_PATH"
+
+3) Configure application (defaults act as initial seeds):
+   - Update Azure Storage connection in appsettings.json
+   - Data paths are set to:
+       Database: $DATA_PATH/database/gateway.db
+       Incoming: $DATA_PATH/incoming
+       Archive:  $DATA_PATH/archive
+       Temp:     $DATA_PATH/temp/api-data
+
+4) Manage systemd service:
+   sudo systemctl daemon-reload
+   sudo systemctl enable $SERVICE_NAME
+   sudo systemctl start $SERVICE_NAME
+   sudo systemctl status $SERVICE_NAME
+
+5) Access:
+   API:     http://localhost:5097
+   Swagger: http://localhost:5097/swagger
+EOF
+    log_info "Deployment guide written to: $INSTALL_PATH/DEPLOYMENT_GUIDE.txt"
+}
+
 
 # Function to create startup script
 create_startup_script() {
@@ -388,7 +410,7 @@ main() {
     echo -e "${GREEN}=== Installation Complete ===${NC}"
     echo "Application Path: $INSTALL_PATH"
     echo "Data Path: $DATA_PATH"
-    echo "Database: $DATA_PATH/database/databasegateway.db"
+    echo "Database: $DATA_PATH/database/gateway.db"
     echo "Service: $SERVICE_NAME"
     echo ""
     echo -e "${BLUE}Next Steps:${NC}"
