@@ -145,10 +145,26 @@ if [ -n "$SOURCE_PATH" ]; then
             exit 1
         fi
 
-        # Ensure dotnet is available (prior steps should have installed it)
+        # Ensure dotnet CLI and SDK are available
         if ! command -v dotnet >/dev/null 2>&1; then
             log_error "dotnet CLI not found. Install .NET or run with --skip-dotnet after manual install."
             exit 1
+        fi
+        if ! dotnet --list-sdks 2>/dev/null | grep -q "^8\."; then
+            log_step "No .NET 8 SDK detected. Installing SDK via dotnet-install.sh"
+            if command -v curl >/dev/null 2>&1; then
+                curl -sSL https://dot.net/v1/dotnet-install.sh -o /tmp/dotnet-install.sh
+            else
+                wget -q https://dot.net/v1/dotnet-install.sh -O /tmp/dotnet-install.sh
+            fi
+            chmod +x /tmp/dotnet-install.sh
+            /tmp/dotnet-install.sh --channel 8.0 --install-dir /usr/share/dotnet
+            ln -sf /usr/share/dotnet/dotnet /usr/bin/dotnet || true
+            if ! dotnet --list-sdks 2>/dev/null | grep -q "^8\."; then
+                log_error ".NET 8 SDK installation failed. Cannot publish."
+                exit 1
+            fi
+            log_info ".NET 8 SDK installed"
         fi
 
         PUBLISH_DIR="$DATA_PATH/temp/publish-$(date +%s)"
