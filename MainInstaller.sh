@@ -107,20 +107,66 @@ if [ -z "$SOURCE_PATH" ]; then
     read -r -p "Enter path to published application files (leave empty to skip deployment): " SOURCE_PATH
 fi
 
+# Normalize source path (expand ~ and make absolute) if provided
+if [ -n "$SOURCE_PATH" ]; then
+    SOURCE_PATH=$(eval echo "$SOURCE_PATH")
+    if command -v realpath >/dev/null 2>&1; then
+        SOURCE_PATH=$(realpath -m "$SOURCE_PATH")
+    fi
+fi
+
 if [ -n "$SOURCE_PATH" ]; then
     log_step "Step 2: Deploying application files"
     if [ ! -d "$SOURCE_PATH" ]; then
         log_error "Source path not found: $SOURCE_PATH"
         exit 1
     fi
+
+    SRC_FOR_COPY="$SOURCE_PATH"
+
     if [ ! -f "$SOURCE_PATH/AzureGateway.Api.dll" ]; then
-        log_error "Application DLL not found in source path: $SOURCE_PATH"
-        log_info "Please ensure you have published the application:"
-        echo "  cd path/to/AzureGateway.Api"
-        echo "  dotnet publish -c Release -o \"$SOURCE_PATH\""
-        exit 1
+        log_step "Publish output not found. Attempting to build and publish the project."
+
+        # Try to locate the project file
+        PROJECT_PATH=""
+        if [ -f "$SOURCE_PATH/AzureGateway.Api.csproj" ]; then
+            PROJECT_PATH="$SOURCE_PATH/AzureGateway.Api.csproj"
+        elif [ -f "$SOURCE_PATH/AzureGateway.Api/AzureGateway.Api.csproj" ]; then
+            PROJECT_PATH="$SOURCE_PATH/AzureGateway.Api/AzureGateway.Api.csproj"
+        else
+            # Fallback: first csproj under the directory
+            PROJECT_PATH=$(find "$SOURCE_PATH" -maxdepth 2 -type f -name "*.csproj" | head -n 1)
+        fi
+
+        if [ -z "$PROJECT_PATH" ]; then
+            log_error "Could not find a .csproj under: $SOURCE_PATH"
+            exit 1
+        fi
+
+        # Ensure dotnet is available (prior steps should have installed it)
+        if ! command -v dotnet >/dev/null 2>&1; then
+            log_error "dotnet CLI not found. Install .NET or run with --skip-dotnet after manual install."
+            exit 1
+        fi
+
+        PUBLISH_DIR="$DATA_PATH/temp/publish-$(date +%s)"
+        mkdir -p "$PUBLISH_DIR"
+        log_step "Publishing project: $PROJECT_PATH -> $PUBLISH_DIR"
+        if ! dotnet publish "$PROJECT_PATH" -c Release -o "$PUBLISH_DIR"; then
+            log_error "dotnet publish failed"
+            exit 1
+        fi
+
+        if [ ! -f "$PUBLISH_DIR/AzureGateway.Api.dll" ]; then
+            log_error "Publish succeeded but AzureGateway.Api.dll not found in: $PUBLISH_DIR"
+            exit 1
+        fi
+
+        SRC_FOR_COPY="$PUBLISH_DIR"
+        log_info "Publish completed. Using published output for deployment."
     fi
-    cp -r "$SOURCE_PATH"/* "$INSTALL_PATH/"
+
+    cp -r "$SRC_FOR_COPY"/* "$INSTALL_PATH/"
     chown -R azuregateway:azuregateway "$INSTALL_PATH"
     chmod +x "$INSTALL_PATH"/*.dll || true
     log_info "Application files deployed"
