@@ -85,8 +85,8 @@ namespace AzureGateway.Api.Data
                 {
                     Name = "Local Folder Monitor",
                     SourceType = DataSource.Folder,
-                    IsEnabled = true,
-                    FolderPath = "C:\\workspace\\PineSageProjects\\incoming",
+                    IsEnabled = false,
+                    FolderPath = "",
                     // Note: FileSystemWatcher does not support brace patterns like "*.{json,jpg,jpeg,png}"
                     // Use "*.*" by default to match all files; narrow to "*.json" or similar as needed.
                     FilePattern = "*.*",
@@ -97,7 +97,7 @@ namespace AzureGateway.Api.Data
                 {
                     Name = "Third Party API",
                     SourceType = DataSource.Api,
-                    IsEnabled = true,
+                    IsEnabled = false,
                     ApiEndpoint = "",
                     PollingIntervalMinutes = 5,
                     CreatedAt = DateTime.UtcNow,
