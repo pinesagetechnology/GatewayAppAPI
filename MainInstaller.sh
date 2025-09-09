@@ -5,11 +5,12 @@ set -e
 
 # Default values
 INSTALL_PATH="/opt/azuregateway"
-DATA_PATH="/var/azuregateway"
+DATA_PATH=""
 SOURCE_PATH=""
 SKIP_DOTNET=false
 SKIP_VALIDATION=false
 VERBOSE=false
+INTERACTIVE=true
 
 # Colors
 RED='\033[0;31m'
@@ -45,17 +46,22 @@ while [[ $# -gt 0 ]]; do
             VERBOSE=true
             shift
             ;;
+        --non-interactive)
+            INTERACTIVE=false
+            shift
+            ;;
         -h|--help)
             echo "Azure Gateway API - Main Installation Script for Linux"
             echo "Usage: $0 [options]"
             echo ""
             echo "Options:"
             echo "  --install-path PATH    Installation directory (default: /opt/azuregateway)"
-            echo "  --data-path PATH       Data directory (default: /var/azuregateway)"
+            echo "  --data-path PATH       Data directory (will prompt if not specified)"
             echo "  --source-path PATH     Path to published application files"
             echo "  --skip-dotnet         Skip .NET installation"
             echo "  --skip-validation     Skip post-installation validation"
             echo "  --verbose             Verbose output"
+            echo "  --non-interactive     Skip user prompts (requires --data-path)"
             echo "  -h, --help            Show this help"
             exit 0
             ;;
@@ -71,12 +77,62 @@ log_warn() { echo -e "${YELLOW}⚠${NC} $1"; }
 log_error() { echo -e "${RED}✗${NC} $1"; }
 log_step() { echo -e "${BLUE}==>${NC} $1"; }
 
+# Function to prompt for data path
+prompt_data_path() {
+    if [ -n "$DATA_PATH" ]; then
+        log_info "Using specified data path: $DATA_PATH"
+        return 0
+    fi
+
+    if [ "$INTERACTIVE" = false ]; then
+        log_error "Data path must be specified when using --non-interactive mode"
+        exit 1
+    fi
+
+    echo ""
+    echo -e "${BLUE}=== Data Directory Configuration ===${NC}"
+    echo "The data directory will store:"
+    echo "  - Database files"
+    echo "  - Incoming files to be processed"
+    echo "  - Archived files"
+    echo "  - Temporary files"
+    echo "  - Application logs"
+    echo ""
+    echo "Recommended locations:"
+    echo "  - /var/azuregateway (system-wide, requires root)"
+    echo "  - /home/\$USER/azuregateway (user-specific)"
+    echo "  - /opt/azuregateway/data (alongside application)"
+    echo ""
+
+    while true; do
+        read -p "Enter the data directory path: " DATA_PATH
+        
+        if [ -z "$DATA_PATH" ]; then
+            log_error "Data path cannot be empty"
+            continue
+        fi
+
+        # Expand tilde and make absolute
+        DATA_PATH=$(eval echo "$DATA_PATH")
+        if command -v realpath >/dev/null 2>&1; then
+            DATA_PATH=$(realpath -m "$DATA_PATH")
+        fi
+
+        # Validate path
+        if [[ "$DATA_PATH" =~ ^/ ]]; then
+            log_info "Using data path: $DATA_PATH"
+            break
+        else
+            log_error "Please provide an absolute path (starting with /)"
+        fi
+    done
+}
+
 echo -e "${GREEN}=== Azure Gateway API Linux Installation ===${NC}"
 echo "This script will install Azure Gateway API on your Linux system"
 echo ""
 echo "Configuration:"
 echo "  Install Path: $INSTALL_PATH"
-echo "  Data Path: $DATA_PATH"
 echo "  Source Path: ${SOURCE_PATH:-'Auto-detect next to this script'}"
 echo ""
 
@@ -85,6 +141,11 @@ if [ "$EUID" -ne 0 ]; then
     log_error "This script must be run as root (use sudo)"
     exit 1
 fi
+
+# Prompt for data path if not specified
+prompt_data_path
+echo "  Data Path: $DATA_PATH"
+echo ""
 
 # Step 1: Run prerequisites installation
 log_step "Step 1: Installing prerequisites and setting up environment"
@@ -204,7 +265,7 @@ Description=Azure Gateway API Service
 After=network.target
 
 [Service]
-Type=simple
+Type=notify
 User=azuregateway
 Group=azuregateway
 WorkingDirectory=$INSTALL_PATH
@@ -214,7 +275,18 @@ RestartSec=10
 KillSignal=SIGINT
 SyslogIdentifier=$SERVICE_NAME
 Environment=ASPNETCORE_ENVIRONMENT=Production
+Environment=ASPNETCORE_URLS=http://+:5000
 Environment=DOTNET_PRINT_TELEMETRY_MESSAGE=false
+
+# Security settings
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=$INSTALL_PATH $DATA_PATH
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
 
 [Install]
 WantedBy=multi-user.target

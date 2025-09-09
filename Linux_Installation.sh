@@ -7,11 +7,12 @@ set -e  # Exit on any error
 
 # Default configuration
 INSTALL_PATH="/opt/azuregateway"
-DATA_PATH="/var/azuregateway"
+DATA_PATH=""
 SERVICE_NAME="azuregateway"
 SERVICE_USER="azuregateway"
 SKIP_DOTNET=false
 VERBOSE=false
+INTERACTIVE=true
 
 # Colors for output
 RED='\033[0;31m'
@@ -39,15 +40,20 @@ while [[ $# -gt 0 ]]; do
             VERBOSE=true
             shift
             ;;
+        --non-interactive)
+            INTERACTIVE=false
+            shift
+            ;;
         -h|--help)
             echo "Azure Gateway API Linux Installation Script"
             echo "Usage: $0 [options]"
             echo ""
             echo "Options:"
             echo "  --install-path PATH    Installation directory (default: /opt/azuregateway)"
-            echo "  --data-path PATH       Data directory (default: /var/azuregateway)"
+            echo "  --data-path PATH       Data directory (will prompt if not specified)"
             echo "  --skip-dotnet         Skip .NET installation"
             echo "  --verbose             Verbose output"
+            echo "  --non-interactive     Skip user prompts (requires --data-path)"
             echo "  -h, --help            Show this help"
             exit 0
             ;;
@@ -102,6 +108,78 @@ check_root() {
         exit 1
     fi
     log_info "Running as root"
+}
+
+# Function to prompt for data path
+prompt_data_path() {
+    if [ -n "$DATA_PATH" ]; then
+        log_info "Using specified data path: $DATA_PATH"
+        return 0
+    fi
+
+    if [ "$INTERACTIVE" = false ]; then
+        log_error "Data path must be specified when using --non-interactive mode"
+        exit 1
+    fi
+
+    echo ""
+    echo -e "${BLUE}=== Data Directory Configuration ===${NC}"
+    echo "The data directory will store:"
+    echo "  - Database files"
+    echo "  - Incoming files to be processed"
+    echo "  - Archived files"
+    echo "  - Temporary files"
+    echo "  - Application logs"
+    echo ""
+    echo "Recommended locations:"
+    echo "  - /var/azuregateway (system-wide, requires root)"
+    echo "  - /home/\$USER/azuregateway (user-specific)"
+    echo "  - /opt/azuregateway/data (alongside application)"
+    echo ""
+
+    while true; do
+        read -p "Enter the data directory path: " DATA_PATH
+        
+        if [ -z "$DATA_PATH" ]; then
+            log_error "Data path cannot be empty"
+            continue
+        fi
+
+        # Expand tilde and make absolute
+        DATA_PATH=$(eval echo "$DATA_PATH")
+        if command -v realpath >/dev/null 2>&1; then
+            DATA_PATH=$(realpath -m "$DATA_PATH")
+        fi
+
+        # Validate path
+        if [[ "$DATA_PATH" =~ ^/ ]]; then
+            log_info "Using data path: $DATA_PATH"
+            break
+        else
+            log_error "Please provide an absolute path (starting with /)"
+        fi
+    done
+}
+
+# Function to validate and create data path
+validate_data_path() {
+    log_step "Validating data path..."
+    
+    # Check if path is writable by root
+    if ! mkdir -p "$DATA_PATH" 2>/dev/null; then
+        log_error "Cannot create data directory: $DATA_PATH"
+        log_info "Please ensure you have write permissions to the parent directory"
+        exit 1
+    fi
+
+    # Check if we can write to the directory
+    if ! touch "$DATA_PATH/.test_write" 2>/dev/null; then
+        log_error "Cannot write to data directory: $DATA_PATH"
+        exit 1
+    fi
+    rm -f "$DATA_PATH/.test_write"
+
+    log_info "Data path validated: $DATA_PATH"
 }
 
 # Function to install package manager packages
@@ -245,8 +323,40 @@ create_directories() {
     chmod 775 "$DATA_PATH/incoming"
     chmod 775 "$DATA_PATH/archive"
     chmod 775 "$DATA_PATH/temp"
+    chmod 775 "$DATA_PATH/database"
     
-    log_info "Directory structure created"
+    # Set up ACL (Access Control Lists) for better permission management
+    log_step "Setting up ACL permissions..."
+    
+    # Install ACL tools if not present
+    if ! command -v setfacl &> /dev/null; then
+        log_info "Installing ACL tools..."
+        case $DISTRO in
+            ubuntu|debian)
+                apt-get install -y acl
+                ;;
+            centos|rhel|fedora)
+                if command -v dnf &> /dev/null; then
+                    dnf install -y acl
+                else
+                    yum install -y acl
+                fi
+                ;;
+        esac
+    fi
+    
+    # Set ACL permissions for data directories
+    for dir in "$DATA_PATH/incoming" "$DATA_PATH/archive" "$DATA_PATH/temp" "$DATA_PATH/database"; do
+        if [ -d "$dir" ]; then
+            setfacl -R -m u:"$SERVICE_USER":rwx "$dir"
+            setfacl -R -m g:"$SERVICE_USER":rwx "$dir"
+            setfacl -R -d -m u:"$SERVICE_USER":rwx "$dir"
+            setfacl -R -d -m g:"$SERVICE_USER":rwx "$dir"
+            verbose_log "Set ACL permissions for: $dir"
+        fi
+    done
+    
+    log_info "Directory structure created with proper permissions"
 }
 
 # Function to update configuration files
@@ -283,7 +393,7 @@ Description=Azure Gateway API Service
 After=network.target
 
 [Service]
-Type=simple
+Type=notify
 User=$SERVICE_USER
 Group=$SERVICE_USER
 WorkingDirectory=$INSTALL_PATH
@@ -293,7 +403,18 @@ RestartSec=10
 KillSignal=SIGINT
 SyslogIdentifier=$SERVICE_NAME
 Environment=ASPNETCORE_ENVIRONMENT=Production
+Environment=ASPNETCORE_URLS=http://+:5000
 Environment=DOTNET_PRINT_TELEMETRY_MESSAGE=false
+
+# Security settings
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=$INSTALL_PATH $DATA_PATH
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
 
 [Install]
 WantedBy=multi-user.target
@@ -380,13 +501,21 @@ EOF
 main() {
     echo -e "${GREEN}=== Azure Gateway API Linux Installation ===${NC}"
     echo "Install Path: $INSTALL_PATH"
-    echo "Data Path: $DATA_PATH"
     echo "Service Name: $SERVICE_NAME"
     echo ""
 
     # Check prerequisites
     check_root
     detect_distro
+    
+    # Prompt for data path if not specified
+    prompt_data_path
+    validate_data_path
+    
+    echo "Data Path: $DATA_PATH"
+    echo ""
+
+    # Install packages
     install_packages
 
     # Install .NET 8 if needed
