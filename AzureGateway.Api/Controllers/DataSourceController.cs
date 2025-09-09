@@ -89,6 +89,17 @@ namespace AzureGateway.Api.Controllers
                 {
                     if (string.IsNullOrEmpty(dataSource.FolderPath))
                         return BadRequest(new { Error = "FolderPath is required for folder data sources" });
+                    
+                    // Validate folder path format (but don't create it yet - let the watcher handle that)
+                    try
+                    {
+                        var normalizedPath = Path.GetFullPath(dataSource.FolderPath);
+                        dataSource.FolderPath = normalizedPath; // Store the normalized path
+                    }
+                    catch (Exception ex)
+                    {
+                        return BadRequest(new { Error = $"Invalid folder path format: {ex.Message}" });
+                    }
                 }
                 else if (dataSource.SourceType == DataSource.Api)
                 {
@@ -131,7 +142,25 @@ namespace AzureGateway.Api.Controllers
 
                 dataSource.Name = request.Name;
                 dataSource.IsEnabled = request.IsEnabled;
-                dataSource.FolderPath = request.FolderPath;
+                
+                // Validate folder path if it's a folder data source
+                if (dataSource.SourceType == DataSource.Folder && !string.IsNullOrEmpty(request.FolderPath))
+                {
+                    try
+                    {
+                        var normalizedPath = Path.GetFullPath(request.FolderPath);
+                        dataSource.FolderPath = normalizedPath; // Store the normalized path
+                    }
+                    catch (Exception ex)
+                    {
+                        return BadRequest(new { Error = $"Invalid folder path format: {ex.Message}" });
+                    }
+                }
+                else
+                {
+                    dataSource.FolderPath = request.FolderPath;
+                }
+                
                 dataSource.ApiEndpoint = request.ApiEndpoint;
                 dataSource.ApiKey = request.ApiKey;
                 dataSource.PollingIntervalMinutes = request.PollingIntervalMinutes;

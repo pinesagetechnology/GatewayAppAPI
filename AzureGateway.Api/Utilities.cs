@@ -83,5 +83,46 @@ namespace AzureGateway.Api.Utilities
                 throw new InvalidOperationException($"Failed to archive file {sourceFile}: {ex.Message}", ex);
             }
         }
+
+        /// <summary>
+        /// Normalizes and validates a folder path for cross-platform compatibility
+        /// </summary>
+        /// <param name="folderPath">The folder path to normalize</param>
+        /// <param name="createIfNotExists">Whether to create the folder if it doesn't exist</param>
+        /// <returns>The normalized folder path</returns>
+        /// <exception cref="ArgumentException">Thrown when the path is invalid</exception>
+        /// <exception cref="DirectoryNotFoundException">Thrown when the folder doesn't exist and cannot be created</exception>
+        public static string NormalizeFolderPath(string folderPath, bool createIfNotExists = true)
+        {
+            if (string.IsNullOrWhiteSpace(folderPath))
+            {
+                throw new ArgumentException("Folder path cannot be null or empty", nameof(folderPath));
+            }
+
+            // Normalize the path for cross-platform compatibility
+            var normalizedPath = Path.GetFullPath(folderPath);
+
+            // Check if directory exists
+            if (!Directory.Exists(normalizedPath))
+            {
+                if (createIfNotExists)
+                {
+                    try
+                    {
+                        Directory.CreateDirectory(normalizedPath);
+                    }
+                    catch (Exception ex)
+                    {
+                        throw new DirectoryNotFoundException($"Failed to create folder path: {normalizedPath}. Error: {ex.Message}", ex);
+                    }
+                }
+                else
+                {
+                    throw new DirectoryNotFoundException($"Folder path does not exist: {normalizedPath}");
+                }
+            }
+
+            return normalizedPath;
+        }
     }
 }

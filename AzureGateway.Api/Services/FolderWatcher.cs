@@ -43,11 +43,25 @@ namespace AzureGateway.Api.Services
                 if (_isRunning) return;
 
                 var folderPath = _config.FolderPath;
-                if (string.IsNullOrEmpty(folderPath) || !Directory.Exists(folderPath))
+                if (string.IsNullOrEmpty(folderPath))
                 {
-                    var error = $"Folder path does not exist: {folderPath}";
+                    var error = "Folder path is not configured";
                     await _onError(_config.Id, error);
-                    throw new DirectoryNotFoundException(error);
+                    throw new ArgumentException(error);
+                }
+
+                try
+                {
+                    // Use the utility method to normalize and create the folder path
+                    folderPath = FileHelper.NormalizeFolderPath(folderPath, createIfNotExists: true);
+                    _logger.LogInformation("Folder path validated and ready: {Path}", folderPath);
+                }
+                catch (Exception ex)
+                {
+                    var error = $"Failed to validate folder path: {folderPath}. Error: {ex.Message}";
+                    _logger.LogError(ex, "Failed to validate folder path: {Path}", folderPath);
+                    await _onError(_config.Id, error);
+                    throw;
                 }
 
                 _watcher = new FileSystemWatcher(folderPath)
