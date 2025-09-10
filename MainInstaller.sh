@@ -77,6 +77,34 @@ log_warn() { echo -e "${YELLOW}⚠${NC} $1"; }
 log_error() { echo -e "${RED}✗${NC} $1"; }
 log_step() { echo -e "${BLUE}==>${NC} $1"; }
 
+# Function to update configuration files in the install path
+update_config_files() {
+    log_step "Updating configuration files..."
+
+    local config_file="$INSTALL_PATH/appsettings.json"
+
+    if [ -f "$config_file" ]; then
+        log_info "Updating $config_file"
+
+        # Create backup
+        cp "$config_file" "$config_file.backup" || true
+
+        # Normalize CRLF just in case
+        sed -i 's/\r$//' "$config_file" || true
+
+        # Replace SQLite database path in connection string
+        # Pattern: "DefaultConnection": "Data Source=..."
+        sed -i "s|\"DefaultConnection\": *\"Data Source=[^\"]*\"|\"DefaultConnection\": \"Data Source=$DATA_PATH/database/gateway.db\"|g" "$config_file"
+
+        # Also update known app paths if present
+        sed -i "s|\"TempDirectory\": *\"[^\"]*\"|\"TempDirectory\": \"$DATA_PATH/temp/api-data\"|g" "$config_file" || true
+        sed -i "s|\"FolderPath\": *\"[^\"]*\"|\"FolderPath\": \"$DATA_PATH/incoming\"|g" "$config_file" || true
+        sed -i "s|\"ArchivePath\": *\"[^\"]*\"|\"ArchivePath\": \"$DATA_PATH/archive\"|g" "$config_file" || true
+
+        log_info "Updated $config_file"
+    fi
+}
+
 # Function to prompt for data path
 prompt_data_path() {
     if [ -n "$DATA_PATH" ]; then
@@ -254,6 +282,9 @@ if [ -n "$SOURCE_PATH" ]; then
     chown -R azuregateway:azuregateway "$INSTALL_PATH"
     chmod +x "$INSTALL_PATH"/*.dll || true
     log_info "Application files deployed"
+
+    # Update configuration files with chosen data path
+    update_config_files
 
     # Step 2b: Ensure systemd service exists after deployment
     SERVICE_NAME="azuregateway"
