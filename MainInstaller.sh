@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Azure Gateway API - Main Installation Script for Linux
 
 set -e

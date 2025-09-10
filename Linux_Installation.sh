@@ -1,4 +1,4 @@
-﻿#!/bin/bash
+﻿#!/usr/bin/env bash
 
 # Azure Gateway API - Linux Installation Script
 # This script installs prerequisites and sets up the Azure Gateway API on Linux
