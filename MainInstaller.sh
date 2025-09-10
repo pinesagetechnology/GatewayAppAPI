@@ -92,10 +92,6 @@ update_config_files() {
         # Normalize CRLF just in case
         sed -i 's/\r$//' "$config_file" || true
 
-        # Replace SQLite database path in connection string
-        # Pattern: "DefaultConnection": "Data Source=..."
-        sed -i "s|\"DefaultConnection\": *\"Data Source=[^\"]*\"|\"DefaultConnection\": \"Data Source=$DATA_PATH/database/gateway.db\"|g" "$config_file"
-
         # Also update known app paths if present
         sed -i "s|\"TempDirectory\": *\"[^\"]*\"|\"TempDirectory\": \"$DATA_PATH/temp/api-data\"|g" "$config_file" || true
         sed -i "s|\"FolderPath\": *\"[^\"]*\"|\"FolderPath\": \"$DATA_PATH/incoming\"|g" "$config_file" || true
