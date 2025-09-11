@@ -393,7 +393,9 @@ Description=Azure Gateway API Service
 After=network.target
 
 [Service]
-Type=notify
+Type=simple
+TimeoutStartSec=120
+TimeoutStopSec=30
 User=$SERVICE_USER
 Group=$SERVICE_USER
 WorkingDirectory=$INSTALL_PATH
@@ -409,8 +411,8 @@ Environment=DOTNET_PRINT_TELEMETRY_MESSAGE=false
 # Security settings
 NoNewPrivileges=true
 PrivateTmp=true
-ProtectSystem=strict
-ProtectHome=true
+ProtectSystem=full
+ProtectHome=false
 ReadWritePaths=$INSTALL_PATH $DATA_PATH
 ProtectKernelTunables=true
 ProtectKernelModules=true
