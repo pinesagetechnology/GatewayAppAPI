@@ -392,7 +392,20 @@ namespace AzureGateway.Api.Services
                 var archivePath = await configService.GetValueAsync("Monitoring.ArchivePath") ?? "./archive";
                 var reasonPath = Path.Combine(archivePath, reason);
 
-                await FileHelper.MoveFileToArchiveAsync(sourceFilePath, reasonPath);
+                // Get the incoming folder path to preserve folder structure
+                var incomingPath = await configService.GetValueAsync("Monitoring.FolderPath") ?? "";
+                
+                if (!string.IsNullOrEmpty(incomingPath))
+                {
+                    // Use the new overload that preserves folder structure
+                    await FileHelper.MoveFileToArchiveAsync(sourceFilePath, reasonPath, incomingPath);
+                }
+                else
+                {
+                    // Fallback to the original method if no incoming path is configured
+                    await FileHelper.MoveFileToArchiveAsync(sourceFilePath, reasonPath);
+                }
+                
                 _logger.LogDebug("Archived file to {ReasonPath}: {FileName}", reasonPath, Path.GetFileName(sourceFilePath));
             }
             catch (Exception ex)

@@ -84,6 +84,43 @@ namespace AzureGateway.Api.Utilities
             }
         }
 
+        public static async Task MoveFileToArchiveAsync(string sourceFile, string archiveDirectory, string baseIncomingPath)
+        {
+            try
+            {
+                if (!Directory.Exists(archiveDirectory))
+                {
+                    Directory.CreateDirectory(archiveDirectory);
+                }
+
+                // Calculate relative path from the incoming folder
+                var relativePath = Path.GetRelativePath(baseIncomingPath, sourceFile);
+                var relativeDir = Path.GetDirectoryName(relativePath);
+                
+                // Create the folder structure in archive
+                var archiveSubDir = string.IsNullOrEmpty(relativeDir) 
+                    ? archiveDirectory 
+                    : Path.Combine(archiveDirectory, relativeDir);
+                
+                if (!Directory.Exists(archiveSubDir))
+                {
+                    Directory.CreateDirectory(archiveSubDir);
+                }
+
+                var fileName = Path.GetFileName(sourceFile);
+                var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
+                var archivedFileName = $"{timestamp}_{fileName}";
+                var destinationPath = Path.Combine(archiveSubDir, archivedFileName);
+
+                // Use File.Move for cross-platform compatibility
+                File.Move(sourceFile, destinationPath);
+            }
+            catch (Exception ex)
+            {
+                throw new InvalidOperationException($"Failed to archive file {sourceFile}: {ex.Message}", ex);
+            }
+        }
+
         /// <summary>
         /// Normalizes and validates a folder path for cross-platform compatibility
         /// </summary>

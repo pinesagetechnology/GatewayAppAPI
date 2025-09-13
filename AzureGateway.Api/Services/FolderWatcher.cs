@@ -67,18 +67,18 @@ namespace AzureGateway.Api.Services
                 _watcher = new FileSystemWatcher(folderPath)
                 {
                     Filter = _config.FilePattern ?? "*.*",
-                    IncludeSubdirectories = false,
+                    IncludeSubdirectories = true,
                     EnableRaisingEvents = false
                 };
 
-                _watcher.Created += OnFileCreated;
-                _watcher.Changed += OnFileChanged;
+                _watcher.Created += OnItemCreated;
+                _watcher.Changed += OnItemChanged;
                 _watcher.Error += OnError;
 
                 _watcher.EnableRaisingEvents = true;
                 _isRunning = true;
 
-                _logger.LogInformation("Started folder watcher for {Name} monitoring {Path} with pattern {Pattern}",
+                _logger.LogInformation("Started folder watcher for {Name} monitoring {Path} with pattern {Pattern} (including subdirectories)",
                     _config.Name, folderPath, _config.FilePattern);
 
                 // Process existing files on startup
@@ -112,14 +112,14 @@ namespace AzureGateway.Api.Services
             }
         }
 
-        private async void OnFileCreated(object sender, FileSystemEventArgs e)
+        private async void OnItemCreated(object sender, FileSystemEventArgs e)
         {
-            await ProcessFileAsync(e.FullPath, "Created");
+            await ProcessItemAsync(e.FullPath, "Created");
         }
 
-        private async void OnFileChanged(object sender, FileSystemEventArgs e)
+        private async void OnItemChanged(object sender, FileSystemEventArgs e)
         {
-            await ProcessFileAsync(e.FullPath, "Changed");
+            await ProcessItemAsync(e.FullPath, "Changed");
         }
 
         private async void OnError(object sender, ErrorEventArgs e)
@@ -127,6 +127,44 @@ namespace AzureGateway.Api.Services
             var error = $"FileSystemWatcher error: {e.GetException().Message}";
             await _onError(_config.Id, error);
             _logger.LogError(e.GetException(), "FileSystemWatcher error in {Name}", _config.Name);
+        }
+
+        private async Task ProcessItemAsync(string itemPath, string eventType)
+        {
+            try
+            {
+                // Check if it's a directory
+                if (Directory.Exists(itemPath))
+                {
+                    await ProcessDirectoryAsync(itemPath, eventType);
+                }
+                // Check if it's a file
+                else if (File.Exists(itemPath))
+                {
+                    await ProcessFileAsync(itemPath, eventType);
+                }
+                else
+                {
+                    // Item doesn't exist yet (might be in the process of being created)
+                    _logger.LogDebug("Item not found yet, skipping: {Path}", itemPath);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error processing item: {Path} ({EventType})", itemPath, eventType);
+                await _onError(_config.Id, $"Error processing item {itemPath}: {ex.Message}");
+            }
+        }
+
+        private async Task ProcessDirectoryAsync(string directoryPath, string eventType)
+        {
+            _logger.LogInformation("Directory {EventType}: {Path}", eventType, directoryPath);
+            
+            // When a new directory is created, process all files in it
+            if (eventType == "Created")
+            {
+                await ProcessExistingFilesAsync(directoryPath);
+            }
         }
 
         private async Task ProcessFileAsync(string filePath, string eventType)
@@ -210,9 +248,11 @@ namespace AzureGateway.Api.Services
             try
             {
                 var pattern = _config.FilePattern ?? "*.*";
-                var files = Directory.GetFiles(folderPath, pattern);
+                
+                // Get files from the current directory and all subdirectories
+                var files = Directory.GetFiles(folderPath, pattern, SearchOption.AllDirectories);
 
-                _logger.LogInformation("Processing {Count} existing files in {Path}", files.Length, folderPath);
+                _logger.LogInformation("Processing {Count} existing files in {Path} (including subdirectories)", files.Length, folderPath);
 
                 foreach (var file in files)
                 {
@@ -311,7 +351,9 @@ namespace AzureGateway.Api.Services
                     Path.Combine(Path.GetDirectoryName(_config.FolderPath) ?? "", "archive");
 
                 var reasonFolder = Path.Combine(archivePath, reason);
-                await FileHelper.MoveFileToArchiveAsync(sourceFile, reasonFolder);
+                
+                // Use the new overload that preserves folder structure
+                await FileHelper.MoveFileToArchiveAsync(sourceFile, reasonFolder, _config.FolderPath);
 
                 _logger.LogDebug("Moved file to archive ({Reason}): {FileName}", reason, Path.GetFileName(sourceFile));
             }
